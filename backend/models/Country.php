@@ -9,28 +9,31 @@ use Yii;
  *
  * @property string $code
  * @property string $name
- * @property int $population
+ * @property int    $population
+ * @property string $file_name [varchar(255)]
  */
-class Country extends \yii\db\ActiveRecord
-{
+class Country extends \yii\db\ActiveRecord {
+
+    public $file;
+
     /**
      * {@inheritdoc}
      */
-    public static function tableName()
-    {
+    public static function tableName() {
         return 'country';
     }
 
     /**
      * {@inheritdoc}
      */
-    public function rules()
-    {
+    public function rules() {
         return [
             [['code', 'name'], 'required'],
             [['population'], 'integer'],
             [['code'], 'string', 'max' => 2],
             [['name'], 'string', 'max' => 52],
+            ['file_name', 'string'],
+            [['file'], 'file'],
             [['code'], 'unique'],
         ];
     }
@@ -38,11 +41,10 @@ class Country extends \yii\db\ActiveRecord
     /**
      * {@inheritdoc}
      */
-    public function attributeLabels()
-    {
+    public function attributeLabels() {
         return [
-            'code' => 'Code',
-            'name' => 'Name',
+            'code'       => 'Code',
+            'name'       => 'Name',
             'population' => 'Population',
         ];
     }
@@ -51,8 +53,7 @@ class Country extends \yii\db\ActiveRecord
      * {@inheritdoc}
      * @return CountryQuery the active query used by this AR class.
      */
-    public static function find()
-    {
+    public static function find() {
         return new CountryQuery(get_called_class());
     }
 }

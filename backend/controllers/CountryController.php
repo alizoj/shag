@@ -8,6 +8,7 @@ use backend\models\CountrySearch;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\filters\VerbFilter;
+use yii\web\UploadedFile;
 
 /**
  * CountryController implements the CRUD actions for Country model.
@@ -61,12 +62,51 @@ class CountryController extends Controller {
      * If creation is successful, the browser will be redirected to the 'view' page.
      *
      * @return mixed
+     * @throws \yii\db\Exception
      */
     public function actionCreate() {
+
         $model = new Country();
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
-            return $this->redirect(['view', 'id' => $model->code]);
+        if ($model->load(Yii::$app->request->post())) {
+
+            $transaction = Yii::$app->db->beginTransaction();
+
+            if ($model->save()) {
+
+                $model->file = UploadedFile::getInstance($model, 'file');
+                if ($model->file) {
+
+                    if ($model->validate()) {
+                        $model->file_name = $model->code . '_' . $model->file->baseName .
+                                            '.' . $model->file->extension;//KZ_image.jpg
+                        $model->save();
+
+                        $file_upload_result = $model->file->saveAs(Yii::getAlias('@uploads') .
+                                                                   '/country/' . $model->file_name);
+
+                        if (!$file_upload_result) {
+                            $transaction->rollBack();
+
+                            return $this->render('create', [
+                                'model' => $model,
+                            ]);
+                        }
+                    } else {
+                        $transaction->rollBack();
+
+                        return $this->render('create', [
+                            'model' => $model,
+                        ]);
+                    }
+                }
+
+                $transaction->commit();
+
+                return $this->redirect(['view', 'id' => $model->code]);
+            } else {
+                $transaction->rollBack();
+            }
         }
 
         return $this->render('create', [
@@ -82,11 +122,55 @@ class CountryController extends Controller {
      *
      * @return mixed
      * @throws NotFoundHttpException if the model cannot be found
+     * @throws \yii\db\Exception
      */
     public function actionUpdate($id) {
+
         $model = $this->findModel($id);
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        if ($model->load(Yii::$app->request->post())) {
+
+            $transaction = Yii::$app->db->beginTransaction();
+
+            if ($model->save()) {
+
+                $model->file = UploadedFile::getInstance($model, 'file');
+
+                if ($model->file) {
+
+                    $upload_dir = Yii::getAlias('@uploads') . '/country/';
+
+                    if ($model->validate()) {
+
+                        $old_file_path = $upload_dir . $model->file_name;
+
+                        $new_file_name = $model->code . '_' . $model->file->baseName . '.' .
+                                         $model->file->extension;
+
+                        $file_upload_result = $model->file->saveAs($upload_dir . $new_file_name);
+
+                        if (!$file_upload_result) {
+                            $transaction->rollBack();
+
+                            return $this->render('update', [
+                                'model' => $model,
+                            ]);
+                        } else {
+                            $model->updateAttributes(['file_name' => $new_file_name]);
+                            @unlink($old_file_path);
+                        }
+                    } else {
+                        $transaction->rollBack();
+
+                        return $this->render('update', [
+                            'model' => $model,
+                        ]);
+                    }
+                }
+            }
+
+            $transaction->commit();
+
             return $this->redirect(['view', 'id' => $model->code]);
         }
 
@@ -138,8 +222,8 @@ class CountryController extends Controller {
 
         Yii::$app->user->identity->id;
 
-//        $row = Country::updateAll(['code' => $code2], ['code' => $code1]);
-//
+        //        $row = Country::updateAll(['code' => $code2], ['code' => $code1]);
+        //
         try {
             $transaction = Yii::$app->db->beginTransaction();
 
@@ -177,5 +261,23 @@ class CountryController extends Controller {
         //        }
 
         //        return "NOT FOUND";
+    }
+
+
+    /**
+     * @param $file_name
+     *                  yii2/country/get-image?file_name=asdasda
+     *
+     * @return bool|\yii\console\Response|\yii\web\Response
+     */
+    public function actionGetImage($file_name) {
+
+        $base_path = Yii::getAlias('@uploads') . '/country/';
+
+        if (file_exists($base_path . $file_name)) {
+            return Yii::$app->response->sendFile($base_path . $file_name);
+        }
+
+        return false;
     }
 }
